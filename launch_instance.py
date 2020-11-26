@@ -106,18 +106,6 @@ echo "8">>log.txt
 sudo systemctl restart postgresql
 """
 
-userdata_oregon = """#!/bin/sh
-cd home/ubuntu
-sudo apt update
-echo "1">>log.txt
-git clone https://github.com/evandrofr/tasks.git
-echo "2">>log.txt
-./tasks/install.sh
-echo "3">>log.txt
-"""
-
-# userdata="" sudo su - postgres -c "echo host all all 192.168.0.0/20 trust >> /etc/postgresql/10/main/pg_hba.conf"
-
 id_instance_ohio = ec2_ohio.create_instances(ImageId=id_AMI_ohio,
                                         MinCount=1,
                                         MaxCount=1,
@@ -137,6 +125,20 @@ id_instance_ohio = ec2_ohio.create_instances(ImageId=id_AMI_ohio,
                                                             },
                                                         ]
                                         )
+
+
+userdata_oregon = """#!/bin/sh
+cd home/ubuntu
+sudo apt update
+echo "1">>log.txt
+git clone https://github.com/evandrofr/tasks.git    
+echo "2">>log.txt
+sudo sed -i 's/node1/{0}/' /home/ubuntu/tasks/portfolio/settings.py
+echo "3">>log.txt
+./tasks/install.sh
+echo "4">>log.txt
+sudo reboot
+""".format(id_instance_ohio)
 
 
 id_instance_oregon = ec2_oregon.create_instances(ImageId=id_AMI_oregon,
