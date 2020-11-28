@@ -78,6 +78,24 @@ def create_AMI(client, instance):
     waiter.wait(ImageIds=[image["ImageId"]])
     print("AMI criada com sucesso.")
 
+def terminate_instance(resource, client, name):
+    print("Deletando Instacia {}...".format(name))
+    try:
+        instaces = resource.instances.filter(Filters=[
+            {'Name': 'tag:Name', 'Values': [name]}
+        ])
+        instaces_id = []
+        for instance in instaces:
+            instaces_id.append(instance.id)
+        if len(instaces_id) > 0:
+            terminate_waiter = client.get_waiter('instance_terminated')
+            instaces.terminate()
+            terminate_waiter.wait(InstanceIds=instaces_id)
+            print("Instancia {} deletada".format(name))    
+        
+    except ClientError as e:
+        print(e)
+
 
 
 sg_id_ohio = security_group(client_ohio,'security_ohio','description')
@@ -113,7 +131,7 @@ sudo ufw allow 5432/tcp
 echo "8">>log.txt
 sudo systemctl restart postgresql
 """
-
+# terminate_instance(ec2_ohio,client_ohio,"DB")
 id_instance_ohio = ec2_ohio.create_instances(ImageId=id_AMI_ohio,
                                         MinCount=1,
                                         MaxCount=1,
@@ -195,8 +213,7 @@ print(id_instance_oregon)
 
 create_AMI(client_oregon, id_instance_oregon)
 
-# instance_id = client_ohio.describe_instances()
-# print(instance_id)
+terminate_instance(ec2_oregon, client_oregon, "ORM")
 
 # waiter = client_ohio.get_waiter('instance_running')
 # waiter.wait(InstanceIds=id_instance_ohio.id)
