@@ -104,7 +104,7 @@ echo "4">>log.txt
 sudo su - postgres
 sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/g" /etc/postgresql/10/main/postgresql.conf
 echo "5">>log.txt
-sudo echo host all all 192.168.0.0/20 trust >> /etc/postgresql/10/main/pg_hba.conf
+sudo echo host all all 0.0.0.0/0 trust >> /etc/postgresql/10/main/pg_hba.conf
 echo "6">>log.txt
 cd /
 cd home/ubuntu
@@ -157,7 +157,9 @@ git clone https://github.com/evandrofr/tasks.git
 echo "2">>log.txt
 sudo sed -i 's/node1/{0}/' /home/ubuntu/tasks/portfolio/settings.py
 echo "3">>log.txt
-./tasks/install.sh
+cd tasks
+./install.sh
+cd ..
 echo "4">>log.txt
 sudo reboot
 """.format(public_ip)
