@@ -71,6 +71,14 @@ def security_group(ec2_client, name, description):
     except ClientError as e:
         print(e)
 
+def create_AMI(client, instance):
+    print("Criando imagem...")
+    waiter = client.get_waiter('image_available')
+    image = client.create_image(InstanceId=instance[0].id, NoReboot=True, Name="ORM_AMI")
+    waiter.wait(ImageIds=[image["ImageId"]])
+    print("AMI criada com sucesso.")
+
+
 
 sg_id_ohio = security_group(client_ohio,'security_ohio','description')
 sg_id_oregon = security_group(client_oregon,'security_oregon','description')
@@ -118,13 +126,27 @@ id_instance_ohio = ec2_ohio.create_instances(ImageId=id_AMI_ohio,
                                                                 'ResourceType': 'instance',
                                                                 'Tags': [
                                                                     {
-                                                                        'Key': 'Ohio',
+                                                                        'Key': 'Name',
                                                                         'Value': 'DB',
                                                                     },
                                                                 ],
                                                             },
                                                         ]
                                         )
+print("Waiting...")
+id_instance_ohio[0].wait_until_running()
+print("Instancia Ohio rodando.")
+#teste -> psql -h localhost -p 5432 -U cloud tasks
+
+
+
+Filters = [{'Name':'tag:Name','Values':['DB']},
+           {'Name':'instance-state-name','Values':['running']}]
+
+resp = client_ohio.describe_instances(Filters=Filters)
+# print("resp: ", resp)
+public_ip = resp['Reservations'][0]['Instances'][0]['PublicIpAddress']
+print("ip: ", public_ip)
 
 
 userdata_oregon = """#!/bin/sh
@@ -138,7 +160,7 @@ echo "3">>log.txt
 ./tasks/install.sh
 echo "4">>log.txt
 sudo reboot
-""".format(id_instance_ohio)
+""".format(public_ip)
 
 
 id_instance_oregon = ec2_oregon.create_instances(ImageId=id_AMI_oregon,
@@ -153,15 +175,26 @@ id_instance_oregon = ec2_oregon.create_instances(ImageId=id_AMI_oregon,
                                                                 'ResourceType': 'instance',
                                                                 'Tags': [
                                                                     {
-                                                                        'Key': 'Oregon',
+                                                                        'Key': 'Name',
                                                                         'Value': 'ORM',
                                                                     },
                                                                 ],
                                                             },
                                                         ]
                                         )
+
+print("Waiting...")
+id_instance_oregon[0].wait_until_running()
+print("Instancia Oregon rodando.")
+
+
 print(id_instance_ohio)
 print(id_instance_oregon)
 
+create_AMI(client_oregon, id_instance_oregon)
+
 # instance_id = client_ohio.describe_instances()
 # print(instance_id)
+
+# waiter = client_ohio.get_waiter('instance_running')
+# waiter.wait(InstanceIds=id_instance_ohio.id)
