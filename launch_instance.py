@@ -51,7 +51,7 @@ def security_group(ec2_client, name, description):
         security_group_id = response['GroupId']
         print('Security Group Created %s in vpc %s.' % (security_group_id, vpc_id))
 
-        data = ec2_client.authorize_security_group_ingress(
+        ec2_client.authorize_security_group_ingress(
             GroupId=security_group_id,
             IpPermissions=[
             {'IpProtocol': 'tcp',
@@ -71,12 +71,13 @@ def security_group(ec2_client, name, description):
     except ClientError as e:
         print(e)
 
-def create_AMI(client, instance):
+def create_AMI(client, instance, name):
     print("Criando imagem...")
     waiter = client.get_waiter('image_available')
-    image = client.create_image(InstanceId=instance[0].id, NoReboot=True, Name="ORM_AMI")
+    image = client.create_image(InstanceId=instance[0].id, NoReboot=True, Name=name)
     waiter.wait(ImageIds=[image["ImageId"]])
     print("AMI criada com sucesso.")
+    return image['ImageId']
 
 def terminate_instance(resource, client, name):
     print("Deletando Instacia {}...".format(name))
@@ -95,6 +96,72 @@ def terminate_instance(resource, client, name):
         
     except ClientError as e:
         print(e)
+
+def create_launch_configuration(session, nameLC, sg_id, keypair, AMI, region):
+    client = session.client('autoscaling', region_name=region)
+
+    print("Criando Launch Configuration...")
+    client.create_launch_configuration(
+        LaunchConfigurationName=nameLC,
+        ImageId=AMI,
+        KeyName=keypair,
+        SecurityGroups=[sg_id],
+        InstanceType='t2.micro'
+    )
+    print("Launch Configuration criado.")
+
+def create_load_balancer(session, client, nameLB, sg_id, region):
+    client = session.client('elb', region_name=region)
+
+    print("Criando LoadBalancer...")
+    client.create_load_balancer(
+        LoadBalancerName=nameLB,
+        Listeners=[
+            {
+                'Protocol':'HTTP',
+                'LoadBalancerPort':80,
+                'InstancePort':8080
+            }
+        ],
+        AvailabilityZones=[
+            'us-west-2a',
+            'us-west-2b',
+            'us-west-2c',
+            'us-west-2d',
+        ],
+        SecurityGroups=[sg_id],
+        Tags=[
+            {'Key': 'Name', 'Value': 'ORM_LB'},
+        ]
+    )
+    print("LoadBalancer criado.")
+
+# def create_AutoScaling(client, AutoScalingGroupName, LaunchConfigurationName):
+#     client.create_auto_scaling_group(
+#         AutoScalingGroupName=AutoScalingGroupName,
+#         LaunchConfigurationName=LaunchConfigurationName,
+#         MinSize=1,
+#         MaxSize=3,
+#         DesiredCapacity=1,
+#         AvailabilityZones=[
+#             'us-west-2a',
+#             'us-west-2b',
+#             'us-west-2c',
+#             'us-west-2d',
+#         ],
+#         LoadBalancerNames=[
+#             'LB',
+#         ],
+#         CapacityRebalance=True
+#     )
+
+#     time.sleep(30)
+
+#     client.update_auto_scaling_group(
+#         AutoScalingGroupName=AutoScalingGroupName,
+#         DesiredCapacity=2,
+#         MinSize=2
+#     )
 
 
 
@@ -211,9 +278,13 @@ print("Instancia Oregon rodando.")
 print(id_instance_ohio)
 print(id_instance_oregon)
 
-create_AMI(client_oregon, id_instance_oregon)
+image_id = create_AMI(client_oregon, id_instance_oregon, 'ORM_AMI')
 
 terminate_instance(ec2_oregon, client_oregon, "ORM")
+
+create_launch_configuration(session_oregon, 'LC_ORM', sg_id_oregon, key_name_oregon, image_id, REGION_NAME_Oregon)
+
+create_load_balancer(session_oregon, client_oregon, 'LBORM', sg_id_oregon, REGION_NAME_Oregon)
 
 # waiter = client_ohio.get_waiter('instance_running')
 # waiter.wait(InstanceIds=id_instance_ohio.id)
