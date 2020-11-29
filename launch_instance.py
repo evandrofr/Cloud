@@ -1,5 +1,6 @@
 import boto3
 import os
+import time
 from decouple import config
 from botocore.exceptions import ClientError
 
@@ -61,6 +62,10 @@ def security_group(ec2_client, name, description):
             {'IpProtocol': 'tcp',
              'FromPort': 5432,
              'ToPort': 5432,
+             'IpRanges': [{'CidrIp': '0.0.0.0/0'}]},
+            {'IpProtocol': 'tcp',
+             'FromPort': 80,
+             'ToPort': 80,
              'IpRanges': [{'CidrIp': '0.0.0.0/0'}]},
             {'IpProtocol': 'tcp',
              'FromPort': 22,
@@ -274,6 +279,12 @@ id_instance_oregon = ec2_oregon.create_instances(ImageId=id_AMI_oregon,
 
 print("Waiting...")
 id_instance_oregon[0].wait_until_running()
+print(id_instance_oregon[0])
+response = client_oregon.describe_instance_status(InstanceIds=[id_instance_oregon[0].id])
+while (response['InstanceStatuses'][0]['InstanceStatus']['Status'] != 'ok'):
+    print(response['InstanceStatuses'][0]['InstanceStatus']['Status'])
+    time.sleep(10)
+    response = client_oregon.describe_instance_status(InstanceIds=[id_instance_oregon[0].id])
 print("Instancia Oregon rodando.")
 
 
