@@ -131,37 +131,39 @@ def create_load_balancer(session, client, nameLB, sg_id, region):
         ],
         SecurityGroups=[sg_id],
         Tags=[
-            {'Key': 'Name', 'Value': 'ORM_LB'},
+            {'Key': 'Name', 'Value': 'LBORM'},
         ]
     )
     print("LoadBalancer criado.")
 
-# def create_AutoScaling(client, AutoScalingGroupName, LaunchConfigurationName):
-#     client.create_auto_scaling_group(
-#         AutoScalingGroupName=AutoScalingGroupName,
-#         LaunchConfigurationName=LaunchConfigurationName,
-#         MinSize=1,
-#         MaxSize=3,
-#         DesiredCapacity=1,
-#         AvailabilityZones=[
-#             'us-west-2a',
-#             'us-west-2b',
-#             'us-west-2c',
-#             'us-west-2d',
-#         ],
-#         LoadBalancerNames=[
-#             'LB',
-#         ],
-#         CapacityRebalance=True
-#     )
+def create_auto_scalling(session, AutoScalingGroupName, LaunchConfigurationName, region):
+    client = session.client('autoscaling', region_name=region)
 
-#     time.sleep(30)
+    print("Criando AS...")
+    client.create_auto_scaling_group(
+        AutoScalingGroupName=AutoScalingGroupName,
+        LaunchConfigurationName=LaunchConfigurationName,
+        MinSize=2,
+        MaxSize=5,
+        DesiredCapacity=2,
+        AvailabilityZones=[
+            'us-west-2a',
+            'us-west-2b',
+            'us-west-2c',
+            'us-west-2d',
+        ],
+        LoadBalancerNames=['LBORM'],
+        CapacityRebalance=True
+    )
+    print("AS criado.")
 
-#     client.update_auto_scaling_group(
-#         AutoScalingGroupName=AutoScalingGroupName,
-#         DesiredCapacity=2,
-#         MinSize=2
-#     )
+    # time.sleep(30)
+
+    # client.update_auto_scaling_group(
+    #     AutoScalingGroupName=AutoScalingGroupName,
+    #     DesiredCapacity=2,
+    #     MinSize=2
+    # )
 
 
 
@@ -286,5 +288,6 @@ create_launch_configuration(session_oregon, 'LC_ORM', sg_id_oregon, key_name_ore
 
 create_load_balancer(session_oregon, client_oregon, 'LBORM', sg_id_oregon, REGION_NAME_Oregon)
 
+create_auto_scalling(session_oregon, 'ASORM', 'LC_ORM', REGION_NAME_Oregon)
 # waiter = client_ohio.get_waiter('instance_running')
 # waiter.wait(InstanceIds=id_instance_ohio.id)
