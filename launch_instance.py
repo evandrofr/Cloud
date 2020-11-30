@@ -162,15 +162,6 @@ def create_auto_scalling(session, AutoScalingGroupName, LaunchConfigurationName,
     )
     print("AS criado.")
 
-    # time.sleep(30)
-
-    # client.update_auto_scaling_group(
-    #     AutoScalingGroupName=AutoScalingGroupName,
-    #     DesiredCapacity=2,
-    #     MinSize=2
-    # )
-
-
 
 sg_id_ohio = security_group(client_ohio,'security_ohio','description')
 sg_id_oregon = security_group(client_oregon,'security_oregon','description')
@@ -250,7 +241,7 @@ echo "2">>log.txt
 sudo sed -i 's/node1/{0}/' /home/ubuntu/tasks/portfolio/settings.py
 echo "3">>log.txt
 cd tasks
-./install.sh
+./install.sh    
 cd ..
 echo "4">>log.txt
 sudo reboot
@@ -280,11 +271,11 @@ id_instance_oregon = ec2_oregon.create_instances(ImageId=id_AMI_oregon,
 print("Waiting...")
 id_instance_oregon[0].wait_until_running()
 print(id_instance_oregon[0])
-response = client_oregon.describe_instance_status(InstanceIds=[id_instance_oregon[0].id])
-while (response['InstanceStatuses'][0]['InstanceStatus']['Status'] != 'ok'):
-    print(response['InstanceStatuses'][0]['InstanceStatus']['Status'])
-    time.sleep(10)
-    response = client_oregon.describe_instance_status(InstanceIds=[id_instance_oregon[0].id])
+res = client_oregon.describe_instance_status(InstanceIds=[id_instance_oregon[0].id])
+while (res['InstanceStatuses'][0]['InstanceStatus']['Status'] != 'ok'):
+    print("Status: {}".format(res['InstanceStatuses'][0]['InstanceStatus']['Status']))
+    time.sleep(20)
+    res = client_oregon.describe_instance_status(InstanceIds=[id_instance_oregon[0].id])
 print("Instancia Oregon rodando.")
 
 
