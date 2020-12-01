@@ -3,7 +3,11 @@ import requests
 from sys import argv
 from datetime import datetime
 
-url = "http://lborm-469629458.us-west-2.elb.amazonaws.com/tasks/"  # url pega manualmente
+with open("DNSName.txt", "r") as file:
+        text = file.readlines()
+
+url = "http://" + text[0] + "/tasks/" 
+print(url)
 
 COMMANDS = ["get", "add", "delete"]
 

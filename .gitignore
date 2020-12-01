@@ -132,3 +132,6 @@ dmypy.json
 
 # keys
 *.pem
+
+# DNS
+DNSName.txt

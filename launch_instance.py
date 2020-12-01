@@ -119,7 +119,7 @@ def create_load_balancer(session, client, nameLB, sg_id, region):
     client = session.client('elb', region_name=region)
 
     print("Criando LoadBalancer...")
-    client.create_load_balancer(
+    res = client.create_load_balancer(
         LoadBalancerName=nameLB,
         Listeners=[
             {
@@ -139,6 +139,8 @@ def create_load_balancer(session, client, nameLB, sg_id, region):
             {'Key': 'Name', 'Value': 'LBORM'},
         ]
     )
+    with open("DNSName.txt", "w") as file:
+            file.write(res['DNSName'])
     print("LoadBalancer criado.")
 
 def create_auto_scalling(session, AutoScalingGroupName, LaunchConfigurationName, region):
