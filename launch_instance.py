@@ -26,6 +26,93 @@ client_oregon = session_oregon.client("ec2")
 key_name_ohio = "evandrofrKey"
 key_name_oregon = "evandrofrKey2"
 
+name_LB = 'LBORM'
+name_AS = 'ASORM'
+name_SG_ohio = 'security_ohio'
+name_SG_oregon = 'security_oregon'
+name_AMI = 'ORM_AMI'
+name_LC = 'LC_ORM'
+tag_ohio = 'DB'
+tag_oregon = 'ORM'
+
+### FUNÇÕES DELETE
+def delete_autoscaling(session, name, region):
+    client = session.client('autoscaling', region_name=region)
+
+    print("Deletando Autoscaling...")
+    try:
+        response = client.describe_auto_scaling_groups()
+        for group in response['AutoScalingGroups']:
+            if group['AutoScalingGroupName'] == name:
+                client.delete_auto_scaling_group(
+                        AutoScalingGroupName=name,
+                        ForceDelete=True
+                )
+        time.sleep(20)
+        print("Autoscaling deletado com sucesso")
+    except ClientError as e:
+        print('Error no AS', e)
+
+def delete_launch_configuration(session, name, region):
+    client = session.client('autoscaling', region_name=region)
+    
+    print("Deletando Launch configuration...")
+    try:
+        if len(client.describe_launch_configurations(LaunchConfigurationNames=[name])['LaunchConfigurations']):
+            response = client.delete_launch_configuration(
+                LaunchConfigurationName=name
+                )
+            print("Launch_configuration deletado com sucesso.")
+
+    except ClientError as e:
+        print('Error no LC', e)
+
+def delete_loadbalancer(session, name, region):
+    client = session.client('elb', region_name=region)
+
+    print("Deletando LoadBalancer...")
+    try:
+        client.delete_load_balancer(LoadBalancerName=name)
+        print("Load Balancer deletado com sucesso.")
+    except ClientError as e:
+        print('Error no LB', e)
+
+def delete_AMI(client, name):
+    print("Deletando AMI...")
+    try:
+        AMI_id = client.describe_images(
+        Filters=[{  'Name': 'name',
+                    'Values': [name] }]
+        )
+
+        if len(AMI_id["Images"]) > 0:
+            AMI_id = AMI_id["Images"][0]["ImageId"]
+            response = client.deregister_image(ImageId=AMI_id)
+            print("AMI deleteada com sucesso.")
+    
+    except ClientError as e:
+        print('Error na AMI', e)
+
+def terminate_instance(resource, client, name):
+    print("Deletando Instacia {}...".format(name))
+    try:
+        instaces = resource.instances.filter(Filters=[
+            {'Name': 'tag:Name', 'Values': [name]}
+        ])
+        instaces_id = []
+        for instance in instaces:
+            instaces_id.append(instance.id)
+        if len(instaces_id) > 0:
+            terminate_waiter = client.get_waiter('instance_terminated')
+            instaces.terminate()
+            terminate_waiter.wait(InstanceIds=instaces_id)
+            print("Instancia {} deletada".format(name))    
+        
+    except ClientError as e:
+        print('Error na Instancia {}'.format(name), e)
+
+
+### FUNÇÕES CREATE
 def key_pair(ec2, key_name):
     file_name = "{0}.pem".format(key_name)
     try:
@@ -84,23 +171,6 @@ def create_AMI(client, instance, name):
     print("AMI criada com sucesso.")
     return image['ImageId']
 
-def terminate_instance(resource, client, name):
-    print("Deletando Instacia {}...".format(name))
-    try:
-        instaces = resource.instances.filter(Filters=[
-            {'Name': 'tag:Name', 'Values': [name]}
-        ])
-        instaces_id = []
-        for instance in instaces:
-            instaces_id.append(instance.id)
-        if len(instaces_id) > 0:
-            terminate_waiter = client.get_waiter('instance_terminated')
-            instaces.terminate()
-            terminate_waiter.wait(InstanceIds=instaces_id)
-            print("Instancia {} deletada".format(name))    
-        
-    except ClientError as e:
-        print(e)
 
 def create_launch_configuration(session, nameLC, sg_id, keypair, AMI, region):
     client = session.client('autoscaling', region_name=region)
@@ -115,7 +185,7 @@ def create_launch_configuration(session, nameLC, sg_id, keypair, AMI, region):
     )
     print("Launch Configuration criado.")
 
-def create_load_balancer(session, client, nameLB, sg_id, region):
+def create_load_balancer(session, nameLB, sg_id, region):
     client = session.client('elb', region_name=region)
 
     print("Criando LoadBalancer...")
@@ -164,10 +234,17 @@ def create_auto_scalling(session, AutoScalingGroupName, LaunchConfigurationName,
     )
     print("AS criado.")
 
+### APAGANDO ANTES DE COMEÇAR
+delete_autoscaling(session_oregon, name_AS, REGION_NAME_Oregon)
+delete_launch_configuration(session_oregon, name_LC, REGION_NAME_Oregon)
+delete_loadbalancer(session_oregon, name_LB, REGION_NAME_Oregon)
+delete_AMI(client_oregon, name_AMI)
+terminate_instance(ec2_ohio, client_ohio, tag_ohio)
 
-sg_id_ohio = security_group(client_ohio,'security_ohio','description')
-sg_id_oregon = security_group(client_oregon,'security_oregon','description')
+### COMEÇO
+sg_id_ohio = security_group(client_ohio, name_SG_ohio,'description')
 print(sg_id_ohio)
+sg_id_oregon = security_group(client_oregon,name_SG_oregon,'description')
 print(sg_id_oregon)
 
 key_pair(ec2_ohio, key_name_ohio)
@@ -212,7 +289,7 @@ id_instance_ohio = ec2_ohio.create_instances(ImageId=id_AMI_ohio,
                                                                 'Tags': [
                                                                     {
                                                                         'Key': 'Name',
-                                                                        'Value': 'DB',
+                                                                        'Value': tag_ohio,
                                                                     },
                                                                 ],
                                                             },
@@ -225,12 +302,11 @@ print("Instancia Ohio rodando.")
 
 
 
-Filters = [{'Name':'tag:Name','Values':['DB']},
+Filters = [{'Name':'tag:Name','Values':[tag_ohio]},
            {'Name':'instance-state-name','Values':['running']}]
 
-resp = client_ohio.describe_instances(Filters=Filters)
-# print("resp: ", resp)
-public_ip = resp['Reservations'][0]['Instances'][0]['PublicIpAddress']
+instances = client_ohio.describe_instances(Filters=Filters)
+public_ip = instances['Reservations'][0]['Instances'][0]['PublicIpAddress']
 print("ip: ", public_ip)
 
 
@@ -263,7 +339,7 @@ id_instance_oregon = ec2_oregon.create_instances(ImageId=id_AMI_oregon,
                                                                 'Tags': [
                                                                     {
                                                                         'Key': 'Name',
-                                                                        'Value': 'ORM',
+                                                                        'Value': tag_oregon,
                                                                     },
                                                                 ],
                                                             },
@@ -284,14 +360,14 @@ print("Instancia Oregon rodando.")
 print(id_instance_ohio)
 print(id_instance_oregon)
 
-image_id = create_AMI(client_oregon, id_instance_oregon, 'ORM_AMI')
+image_id = create_AMI(client_oregon, id_instance_oregon, name_AMI)
 
-terminate_instance(ec2_oregon, client_oregon, "ORM")
+terminate_instance(ec2_oregon, client_oregon, tag_oregon)
 
-create_launch_configuration(session_oregon, 'LC_ORM', sg_id_oregon, key_name_oregon, image_id, REGION_NAME_Oregon)
+create_launch_configuration(session_oregon, name_LC, sg_id_oregon, key_name_oregon, image_id, REGION_NAME_Oregon)
 
-create_load_balancer(session_oregon, client_oregon, 'LBORM', sg_id_oregon, REGION_NAME_Oregon)
+create_load_balancer(session_oregon, name_LB, sg_id_oregon, REGION_NAME_Oregon)
 
-create_auto_scalling(session_oregon, 'ASORM', 'LC_ORM', REGION_NAME_Oregon)
+create_auto_scalling(session_oregon, name_AS, name_LC, REGION_NAME_Oregon)
 # waiter = client_ohio.get_waiter('instance_running')
 # waiter.wait(InstanceIds=id_instance_ohio.id)
