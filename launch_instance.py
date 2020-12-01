@@ -48,7 +48,12 @@ def delete_autoscaling(session, name, region):
                         AutoScalingGroupName=name,
                         ForceDelete=True
                 )
-        time.sleep(20)
+
+        done = False
+        while not done:
+            if len(client.describe_auto_scaling_groups(AutoScalingGroupNames=[name])['AutoScalingGroups']) == 0:
+                done = True
+            time.sleep(5)
         print("Autoscaling deletado com sucesso")
     except ClientError as e:
         print('Error no AS', e)
@@ -275,7 +280,6 @@ sudo ufw allow 5432/tcp
 echo "8">>log.txt
 sudo systemctl restart postgresql
 """
-# terminate_instance(ec2_ohio,client_ohio,"DB")
 id_instance_ohio = ec2_ohio.create_instances(ImageId=id_AMI_ohio,
                                         MinCount=1,
                                         MaxCount=1,

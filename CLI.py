@@ -7,7 +7,6 @@ with open("DNSName.txt", "r") as file:
         text = file.readlines()
 
 url = "http://" + text[0] + "/tasks/" 
-print(url)
 
 COMMANDS = ["get", "add", "delete"]
 
